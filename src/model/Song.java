@@ -1,14 +1,14 @@
 package model;
 
 public class Song {
-    private String songId;
+    private int id;
     private String title;
     private String artist;
     private String category;
-    private boolean isFree;
+    private String coverPath;
+    private String audioPath;  // Stored Base64 or file path
     private double price;
-    private double rating; // average rating
-    private String coverImagePath;
-    private String songFilePath;
+    private double rating;
+    private int downloads;
 }
 

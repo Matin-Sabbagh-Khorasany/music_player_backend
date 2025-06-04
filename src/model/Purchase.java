@@ -1,8 +1,8 @@
 package model;
 
 public class Purchase {
-    private String userId;
-    private String songId;
-    private long purchaseTimestamp;
+    private int songId;
+    private String username;
+    private String purchaseDate;
 }
 
