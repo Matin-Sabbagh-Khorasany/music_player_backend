@@ -1,0 +1,5 @@
+password=$2a$10$tKiiefsY4EgunjFvPe/NAex00TJEQvocmZssqcE557KsjYF7wfsRa
+email=matinsbg84@gmail.com
+credit=0.0
+subscription_tier=none
+subscription_expiry=

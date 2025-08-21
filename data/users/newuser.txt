@@ -1,0 +1,5 @@
+password=$2a$10$N17EIoq6RCJO1aevZHksSe2xKY7cjvlfIG7yMI7mrGTnbOCowkwFi
+email=new@email.com
+credit=0.0
+subscription_tier=none
+subscription_expiry=
