@@ -5,17 +5,20 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.List;
 
 public class ClientHandler implements Runnable {
 
     private final Socket clientSocket;
     private final UserService userService;
+    private final DatabaseManager dbManager;
     private PrintWriter out;
     private BufferedReader in;
 
     public ClientHandler(Socket socket) {
         this.clientSocket = socket;
         this.userService = new UserService();
+        this.dbManager = new DatabaseManager();
     }
 
     @Override
@@ -88,6 +91,22 @@ public class ClientHandler implements Runnable {
                     }
                     break;
 
+                case "ADD_CREDIT":
+                    if (parts.length == 3) {
+                        handleUpdateCredit(parts[1], parts[2]);
+                    } else {
+                        out.println("ERROR::INVALID_CREDIT_FORMAT");
+                    }
+                    break;
+
+                case "GET_SONGS_BY_CATEGORY":
+                    if (parts.length == 2) {
+                        handleGetSongsByCategory(parts[1]);
+                    } else {
+                        out.println("ERROR::INVALID_SONG_REQUEST_FORMAT");
+                    }
+                    break;
+
                 default:
                     out.println("ERROR::UNKNOWN_COMMAND::" + commandType);
                     break;
@@ -107,5 +126,36 @@ public class ClientHandler implements Runnable {
     private void handleLogin(String username, String password) {
         String response = userService.loginUser(username, password);
         out.println(response);
+    }
+
+    private void handleUpdateCredit(String username, String amountStr) {
+        try {
+            double amount = Double.parseDouble(amountStr);
+            String response = userService.addCreditToUser(username, amount);
+            out.println(response);
+        } catch (NumberFormatException e) {
+            out.println("ADD_CREDIT_FAILED::INVALID_AMOUNT");
+        }
+    }
+
+    /**
+     * This is the "recipe" for handling a request for songs.
+     * It uses the DatabaseManager to get the songs and sends them to the app.
+     *
+     * @param category The category name received from the app.
+     */
+    private void handleGetSongsByCategory(String category) {
+        // Use the DatabaseManager to get the list of song data strings
+        List<String> songs = dbManager.getSongsByCategory(category);
+
+        // Loop through the list and send each song to the app, one by one
+        for (String songData : songs) {
+            // We add "SONG_DATA::" at the beginning so the app knows this is a song
+            out.println("SONG_DATA::" + songData);
+        }
+
+        // After sending all the songs, we send a special message
+        // to tell the app that the list is finished. This is very important!
+        out.println("SONGS_END");
     }
 }
