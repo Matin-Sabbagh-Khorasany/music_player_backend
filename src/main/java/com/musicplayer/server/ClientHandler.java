@@ -49,6 +49,7 @@ public class ClientHandler implements Runnable {
     }
 
     private void processCommand(String command) {
+        System.out.println("SERVER RECEIVED RAW COMMAND: [" + command + "]");
         // مرحله 1: اگر ورودی null است، خارج شو
         if (command == null) {
             return;
@@ -145,17 +146,15 @@ public class ClientHandler implements Runnable {
      * @param category The category name received from the app.
      */
     private void handleGetSongsByCategory(String category) {
-        // Use the DatabaseManager to get the list of song data strings
         List<String> songs = dbManager.getSongsByCategory(category);
+        System.out.println("SERVER FOUND " + songs.size() + " SONGS. NOW SENDING TO APP...");
 
-        // Loop through the list and send each song to the app, one by one
         for (String songData : songs) {
-            // We add "SONG_DATA::" at the beginning so the app knows this is a song
             out.println("SONG_DATA::" + songData);
+            out.flush(); // Manually flush the buffer after sending a song
         }
 
-        // After sending all the songs, we send a special message
-        // to tell the app that the list is finished. This is very important!
         out.println("SONGS_END");
+        out.flush(); // Manually flush the buffer after sending the final message
     }
 }

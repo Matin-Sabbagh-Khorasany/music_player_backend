@@ -7,13 +7,11 @@ import java.util.List;
 public class DatabaseManager {
     // --- This part tells Java how to connect to the Laragon database ---
     // The database name "music_player_db" must be exactly what you created.
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/music_player_db?useSSL=false&serverTimezone=UTC";
-
-    // The default username for Laragon is "root".
-    private static final String DB_USER = "root";
+    private static final String DB_URL = "jdbc:mariadb://127.0.0.1:3306/music_player_db?allowPublicKeyRetrieval=true";
+    private static final String DB_USER = "musicuser";
 
     // The default password for Laragon is blank (an empty string).
-    private static final String DB_PASSWORD = "";
+    private static final String DB_PASSWORD = "password123";
     // --------------------------------------------------------------------
 
     /**
@@ -27,27 +25,24 @@ public class DatabaseManager {
         List<String> songDataStrings = new ArrayList<>();
         String sql = "SELECT * FROM songs WHERE category = ?";
 
-        // This "try-with-resources" block is a safe way to connect to the database.
-        // It automatically closes the connection when it's done, which is very important.
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            pstmt.setString(1, category); // This safely adds the category name to the SQL query
-            ResultSet rs = pstmt.executeQuery(); // This runs the query to get the songs
+            pstmt.setString(1, category);
+            ResultSet rs = pstmt.executeQuery();
 
-            // This loop goes through each song that the database found
             while (rs.next()) {
-                // We build a single line of text with all the song's info, separated by "::"
-                // This format is easy for our Flutter app to understand.
+                // This version just gets the data and joins it, without any image processing.
                 String songString = String.join("::",
                         rs.getString("title"),
                         rs.getString("artist"),
                         rs.getString("coverImagePath"),
                         rs.getString("audioUrl"),
+                        rs.getString("sampleAudioUrl"), 
                         String.valueOf(rs.getDouble("price")),
                         rs.getString("requiredAccessTier")
                 );
-                songDataStrings.add(songString); // Add the song's text to our list
+                songDataStrings.add(songString);
             }
             System.out.println("DatabaseManager: Found " + songDataStrings.size() + " songs for category: " + category);
 
@@ -55,6 +50,6 @@ public class DatabaseManager {
             System.err.println("DatabaseManager: Error when fetching songs for category: " + category);
             e.printStackTrace();
         }
-        return songDataStrings; // Return the final list of songs
+        return songDataStrings;
     }
 }

@@ -15,14 +15,14 @@
     </properties>
 
     <dependencies>
-        <!-- MySQL Connector for database connection -->
+        <!-- 1. The Key for the Database (MariaDB version) -->
         <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-java</artifactId>
-            <version>8.0.33</version>
+            <groupId>org.mariadb.jdbc</groupId>
+            <artifactId>mariadb-java-client</artifactId>
+            <version>3.0.8</version>
         </dependency>
 
-        <!-- jBCrypt for secure password hashing -->
+        <!-- 2. The Tool for Hashing Passwords -->
         <dependency>
             <groupId>org.mindrot</groupId>
             <artifactId>jbcrypt</artifactId>
