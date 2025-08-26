@@ -98,7 +98,7 @@ public class UserService {
                     String[] parts = line.split(SEPARATOR, -1);
 
                     // This now ONLY checks the username (at index 0)
-                    if (parts.length > 2 && parts[0].equals(username)) {
+                    if (parts.length > 2 && (parts[0].equals(username) || parts[1].equalsIgnoreCase(username))) {
                         String storedHashedPassword = parts[2];
                         if (BCrypt.checkpw(password, storedHashedPassword)) {
                             System.out.println("User logged in successfully: " + parts[0]);
@@ -224,5 +224,202 @@ public class UserService {
             e.printStackTrace();
         }
         return false;
+    }
+
+    public String deleteUser(String username) {
+        lock.writeLock().lock(); // Lock the file for writing
+
+        File originalFile = new File(USER_DATA_FILE);
+        File tempFile = new File(USER_DATA_DIRECTORY + "/users.tmp");
+
+        if (!originalFile.exists()) {
+            lock.writeLock().unlock();
+            return "DELETE_FAILED::SERVER_ERROR";
+        }
+
+        boolean userFound = false;
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(originalFile));
+             BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile))) {
+
+            String currentLine;
+            while ((currentLine = reader.readLine()) != null) {
+                String[] parts = currentLine.split(SEPARATOR, -1);
+
+                // Check if this is the user we want to delete
+                if (parts.length > 0 && parts[0].equals(username)) {
+                    userFound = true;
+                    // If it is the correct user, we simply DO NOT write their line
+                    // to the new file, effectively deleting them.
+                    continue;
+                }
+
+                // For all other users, we write their line to the new file.
+                writer.write(currentLine + System.lineSeparator());
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            lock.writeLock().unlock();
+            tempFile.delete(); // Clean up the temp file on error
+            return "DELETE_FAILED::FILE_IO_ERROR";
+        }
+
+        // If the user was found, we replace the old file with the new one.
+        if (userFound) {
+            if (!originalFile.delete() || !tempFile.renameTo(originalFile)) {
+                System.err.println("CRITICAL: Could not replace user file during deletion for user: " + username);
+                lock.writeLock().unlock();
+                return "DELETE_FAILED::CRITICAL_SERVER_ERROR";
+            }
+
+            System.out.println("Successfully deleted user: " + username);
+            lock.writeLock().unlock();
+            return "DELETE_SUCCESS";
+
+        } else {
+            // If the user was never in the file, we just clean up.
+            tempFile.delete();
+            lock.writeLock().unlock();
+            return "DELETE_FAILED::USER_NOT_FOUND";
+        }
+    }
+
+    public String updateProfile(String username, String newFullName, String newEmail) {
+        lock.writeLock().lock(); // Lock the file for writing
+
+        File originalFile = new File(USER_DATA_FILE);
+        File tempFile = new File(USER_DATA_DIRECTORY + "/users.tmp");
+
+        if (!originalFile.exists()) {
+            lock.writeLock().unlock();
+            return "UPDATE_FAILED::SERVER_ERROR";
+        }
+
+        boolean userFound = false;
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(originalFile));
+             BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile))) {
+
+            String currentLine;
+            while ((currentLine = reader.readLine()) != null) {
+                String[] parts = currentLine.split(SEPARATOR, -1);
+
+                // Check if this is the user we want to update
+                if (!userFound && parts.length > 1 && parts[0].equals(username)) {
+                    userFound = true;
+
+                    // Update the name (at index 0) and email (at index 1)
+                    parts[0] = newFullName; // IMPORTANT: We are changing the username/name here
+                    parts[1] = newEmail;
+
+                    // Write the MODIFIED line to the temp file
+                    writer.write(String.join(SEPARATOR, parts) + System.lineSeparator());
+                } else {
+                    // For all other users, write their original line to the new file.
+                    writer.write(currentLine + System.lineSeparator());
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            lock.writeLock().unlock();
+            tempFile.delete(); // Clean up on error
+            return "UPDATE_FAILED::FILE_IO_ERROR";
+        }
+
+        // If the user was found, replace the old file with the new one.
+        if (userFound) {
+            if (!originalFile.delete() || !tempFile.renameTo(originalFile)) {
+                System.err.println("CRITICAL: Could not replace user file during profile update for user: " + username);
+                lock.writeLock().unlock();
+                return "UPDATE_FAILED::CRITICAL_SERVER_ERROR";
+            }
+
+            System.out.println("Successfully updated profile for user: " + username + " to new name: " + newFullName);
+            lock.writeLock().unlock();
+            return "UPDATE_SUCCESS::" + newFullName + "::" + newEmail;
+
+        } else {
+            tempFile.delete();
+            lock.writeLock().unlock();
+            return "UPDATE_FAILED::USER_NOT_FOUND";
+        }
+    }
+
+    public String changePassword(String username, String oldPassword, String newPassword) {
+        lock.writeLock().lock(); // Lock the file for writing
+
+        File originalFile = new File(USER_DATA_FILE);
+        File tempFile = new File(USER_DATA_DIRECTORY + "/users.tmp");
+
+        if (!originalFile.exists()) {
+            lock.writeLock().unlock();
+            return "CHANGE_PASSWORD_FAILED::SERVER_ERROR";
+        }
+
+        boolean userFound = false;
+        boolean oldPasswordIsCorrect = false;
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(originalFile));
+             BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile))) {
+
+            String currentLine;
+            while ((currentLine = reader.readLine()) != null) {
+                String[] parts = currentLine.split(SEPARATOR, -1);
+
+                if (!userFound && parts.length > 2 && parts[0].equals(username)) {
+                    userFound = true;
+                    String storedHashedPassword = parts[2];
+
+                    // First, verify the old password is correct
+                    if (BCrypt.checkpw(oldPassword, storedHashedPassword)) {
+                        oldPasswordIsCorrect = true;
+
+                        // If it's correct, hash the NEW password
+                        String newHashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+                        parts[2] = newHashedPassword; // Update the password field
+
+                        // Write the MODIFIED line to the temp file
+                        writer.write(String.join(SEPARATOR, parts) + System.lineSeparator());
+                    } else {
+                        // If old password is wrong, do not change anything.
+                        // Just write the original line back.
+                        writer.write(currentLine + System.lineSeparator());
+                    }
+                } else {
+                    // For all other users, write their original line to the new file.
+                    writer.write(currentLine + System.lineSeparator());
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            lock.writeLock().unlock();
+            tempFile.delete();
+            return "CHANGE_PASSWORD_FAILED::FILE_IO_ERROR";
+        }
+
+        // Now, decide what response to send based on what we found
+        if (!userFound) {
+            tempFile.delete();
+            lock.writeLock().unlock();
+            return "CHANGE_PASSWORD_FAILED::USER_NOT_FOUND";
+        }
+
+        if (!oldPasswordIsCorrect) {
+            tempFile.delete(); // We don't need the temp file because nothing changed
+            lock.writeLock().unlock();
+            return "CHANGE_PASSWORD_FAILED::OLD_PASSWORD_INCORRECT";
+        }
+
+        // If we get here, it means the user was found AND the old password was correct.
+        // So, we can safely replace the old file with the new one.
+        if (!originalFile.delete() || !tempFile.renameTo(originalFile)) {
+            System.err.println("CRITICAL: Could not replace user file during password change for user: " + username);
+            lock.writeLock().unlock();
+            return "CHANGE_PASSWORD_FAILED::CRITICAL_SERVER_ERROR";
+        }
+
+        System.out.println("Successfully changed password for user: " + username);
+        lock.writeLock().unlock();
+        return "CHANGE_PASSWORD_SUCCESS";
     }
 }

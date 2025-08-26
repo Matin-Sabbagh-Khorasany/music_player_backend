@@ -101,10 +101,38 @@ public class ClientHandler implements Runnable {
                     break;
 
                 case "GET_SONGS_BY_CATEGORY":
-                    if (parts.length == 2) {
-                        handleGetSongsByCategory(parts[1]);
+                    if (parts.length == 3) {
+                        // New command with sorting: GET_SONGS_BY_CATEGORY::Category::rating_desc
+                        handleGetSongsByCategory(parts[1], parts[2]);
+                    } else if (parts.length == 2) {
+                        // Old command with default sorting
+                        handleGetSongsByCategory(parts[1], "default");
                     } else {
                         out.println("ERROR::INVALID_SONG_REQUEST_FORMAT");
+                    }
+                    break;
+
+                case "DELETE_ACCOUNT":
+                    if (parts.length == 2) {
+                        handleDeleteAccount(parts[1]);
+                    } else {
+                        out.println("ERROR::INVALID_DELETE_FORMAT");
+                    }
+                    break;
+
+                case "UPDATE_PROFILE":
+                    if (parts.length == 4) {
+                        handleUpdateProfile(parts[1], parts[2], parts[3]);
+                    } else {
+                        out.println("ERROR::INVALID_UPDATE_FORMAT");
+                    }
+                    break;
+
+                case "CHANGE_PASSWORD":
+                    if (parts.length == 4) {
+                        handleChangePassword(parts[1], parts[2], parts[3]);
+                    } else {
+                        out.println("ERROR::INVALID_PASSWORD_CHANGE_FORMAT");
                     }
                     break;
 
@@ -145,16 +173,30 @@ public class ClientHandler implements Runnable {
      *
      * @param category The category name received from the app.
      */
-    private void handleGetSongsByCategory(String category) {
-        List<String> songs = dbManager.getSongsByCategory(category);
-        System.out.println("SERVER FOUND " + songs.size() + " SONGS. NOW SENDING TO APP...");
+    private void handleGetSongsByCategory(String category, String sortCriteria) {
+        // Pass the category and the sort instruction to the DatabaseManager
+        List<String> songs = dbManager.getSongsByCategory(category, sortCriteria);
 
+        System.out.println("SERVER FOUND " + songs.size() + " SONGS. NOW SENDING TO APP...");
         for (String songData : songs) {
             out.println("SONG_DATA::" + songData);
-            out.flush(); // Manually flush the buffer after sending a song
         }
-
         out.println("SONGS_END");
-        out.flush(); // Manually flush the buffer after sending the final message
+        out.flush();
+    }
+
+    private void handleDeleteAccount(String username) {
+        String response = userService.deleteUser(username);
+        out.println(response);
+    }
+
+    private void handleUpdateProfile(String oldUsername, String newFullName, String newEmail) {
+        String response = userService.updateProfile(oldUsername, newFullName, newEmail);
+        out.println(response);
+    }
+
+    private void handleChangePassword(String username, String oldPassword, String newPassword) {
+        String response = userService.changePassword(username, oldPassword, newPassword);
+        out.println(response);
     }
 }

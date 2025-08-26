@@ -21,9 +21,26 @@ public class DatabaseManager {
      * @param category The name of the category to search for (e.g., "ایرانی")
      * @return A list of song data strings, ready to be sent over the socket.
      */
-    public List<String> getSongsByCategory(String category) {
+    public List<String> getSongsByCategory(String category, String sortCriteria) {
         List<String> songDataStrings = new ArrayList<>();
-        String sql = "SELECT * FROM songs WHERE category = ?";
+        String orderByClause = ""; // Default is no sorting
+
+        // --- NEW SORTING LOGIC ---
+        // We use a switch statement to safely build the sorting part of our SQL query.
+        // This prevents a security issue called SQL Injection.
+        switch (sortCriteria) {
+            case "rating_desc": // "desc" means descending, or High to Low
+                orderByClause = " ORDER BY averageRating DESC";
+                break;
+            case "rating_asc": // "asc" means ascending, or Low to High
+                orderByClause = " ORDER BY averageRating ASC";
+                break;
+            // We can add more sort options here later, like by price or title.
+        }
+        // -------------------------
+
+        // We add our safe orderByClause to the end of the main SQL command.
+        String sql = "SELECT * FROM songs WHERE category = ?" + orderByClause;
 
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -32,22 +49,22 @@ public class DatabaseManager {
             ResultSet rs = pstmt.executeQuery();
 
             while (rs.next()) {
-                // This version just gets the data and joins it, without any image processing.
                 String songString = String.join("::",
                         rs.getString("title"),
                         rs.getString("artist"),
                         rs.getString("coverImagePath"),
                         rs.getString("audioUrl"),
-                        rs.getString("sampleAudioUrl"), 
+                        rs.getString("sampleAudioUrl"),
                         String.valueOf(rs.getDouble("price")),
-                        rs.getString("requiredAccessTier")
+                        rs.getString("requiredAccessTier"),
+                        String.valueOf(rs.getDouble("averageRating"))
                 );
                 songDataStrings.add(songString);
             }
-            System.out.println("DatabaseManager: Found " + songDataStrings.size() + " songs for category: " + category);
+            System.out.println("DatabaseManager: Found " + songDataStrings.size() + " songs for category '" + category + "' sorted by '" + sortCriteria + "'");
 
         } catch (SQLException e) {
-            System.err.println("DatabaseManager: Error when fetching songs for category: " + category);
+            System.err.println("DatabaseManager: Error when fetching songs.");
             e.printStackTrace();
         }
         return songDataStrings;
